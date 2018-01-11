@@ -1,0 +1,1021 @@
+---
+title: "資料分析"
+---
+
+# 資料匯入
+
+```{r source, message=FALSE, results='hide'}
+Sys.setlocale(category='LC_ALL', locale='C')
+
+site_all = read.csv(file.path("datasets", "site_all.csv"), encoding = "UTF-8", stringsAsFactors=FALSE)
+site_hour = read.csv(file.path("datasets", "site_hour.csv"), encoding = "UTF-8", stringsAsFactors=FALSE)
+site_hour$AQI[site_hour$AQI == "??"] <- "Very Unhealthy"
+site_hour$date.v2 = as.Date(site_hour$date.v2)
+```
+
+# 套件執行
+
+```{r library, message=FALSE}
+library(ggplot2)
+library(ggmap)
+library(mapproj)
+library(animation)
+library(gganimate)
+library(ggthemes)
+library(dplyr)
+library(plotly)
+```
+
+# 整體分析
+
+透過統計臺中火力發電廠周遭空氣品質監測站之PM2.5逐時濃度資料，瞭解各測站是否有在特定時間點空氣品質不佳之情形，若發現各測站於特定時間點皆有空氣品質不佳之情形，後續則可用以推測其不佳因素是否與火力發電廠排放之汙染氣體相關。
+
+```{r animate, eval=FALSE}
+all.animate <- ggmap(get_googlemap(center=c(120.545644, 24.220108),
+                    zoom=11,maptype='terrain'))+
+  geom_point(data = site_all,
+             aes(x = x, y = y,
+                 frame = date.v2,
+                 cumulative = TRUE),
+             size = 4,
+             colour= site_all$color,
+             show.legend = F) +
+  scale_colour_manual(name = "AQI",
+                      labels = c("Good","Moderate","Unhealthy for Sensitive Groups","Unhealthy","Very   
+                                 Unhealthy","Hazardous"),
+                      values = c("#7401df", "#fce700", "#fc9f00",
+                                 "#FF0000","#7401DF","#8A0808")) +
+  scale_shape_manual(name = "AQI",
+                     labels = c("Good","Moderate","Unhealthy for Sensitive Groups","Unhealthy","Very
+                                unhealthy","Hazardous"),
+                     values = c(19, 19, 19, 19, 19, 19))+
+  theme(legend.position = "right")+
+  scale_x_continuous(limits = c(120.35, 120.75), expand = c(0, 0)) +
+  scale_y_continuous(limits = c(24.1, 24.35), expand = c(0, 0))+
+  ggtitle("台中地區 PM2.5 AQI 逐日變化圖")+
+  theme(plot.title = element_text(size = 16, face = "bold", hjust = 0.3))+
+  ylab("Latitude") + 
+  xlab("Longitude")
+  
+all.animate
+
+gganimate(all.animate)
+```
+
+<img src="visuals/pm25.gif"/>
+
+### 圖示呈現
+
+首先彙整本次報告採用之測站每日PM2.5逐時濃度。於整體部分，空氣品質普通次數最多，對敏感族群不健康次之，而在紫爆(不健康)、危害等狀況次數極少，且於圖中並未顯示出有單一時刻空氣品質不佳之情形
+
+```{r overall.plot, warning=FALSE}
+b_all <- site_hour %>%
+  group_by(hours, AQI) %>%
+  mutate(n=1)%>%
+  summarise(sum = sum(n)) %>%
+  mutate(h = as.numeric(hours))
+
+ggplot(data = b_all,
+         aes(x = b_all$hours, y = b_all$sum, 
+             group = b_all$AQI, 
+             colour = b_all$AQI)) +
+           geom_line()+
+    scale_color_manual(values=c("#8A0808","#56ed00","#eded02","#7401DF","#fc9f00", "#FF0000"))+
+  scale_color_discrete(name="AQI")+
+  theme(legend.key = element_rect(fill = "white"))+
+    ggtitle("AQI Hourly Stats")+
+  theme(plot.title =
+            element_text(size = 16, face = "bold", hjust = 0.5))+
+    ylab("Frequency") +
+    xlab("HR")
+
+```
+
+### 表格呈現
+
+再以表格分析各測站之空氣品質情形，表格如下所示，可見各監測站點所呈現之空氣品質並未有單ㄧ站點數值特別高的情況。
+
++ 良好 (Good)
+
+```{r good, message=FALSE}
+#install.packages("readxl")
+library(readxl)
+hour_pm25_g <- read_xlsx("datasets/hour_pm25_final_v2.xlsx", sheet = 'g')
+hour_pm25_g
+```
+
++ 普通 (Moderate)
+
+```{r mod}
+hour_pm25_y <- read_xlsx("datasets/hour_pm25_final_v2.xlsx", sheet = 'y')
+hour_pm25_y
+```
+
++ 對敏感族群不健康 (Unhealthy for Sensitive Groups)
+
+```{r sens}
+hour_pm25_o <- read_xlsx("datasets/hour_pm25_final_v2.xlsx", sheet = 'o')
+hour_pm25_o
+```
+
++ 對所有族群不健康 (Unhealthy)
+
+```{r unhealthy}
+hour_pm25_r <- read_xlsx("datasets/hour_pm25_final_v2.xlsx", sheet = 'r')
+hour_pm25_r
+```
+
++ 紫爆 (Very Unhealthy)
+
+```{r veryun}
+hour_pm25_p <- read_xlsx("datasets/hour_pm25_final_v2.xlsx", sheet = 'p')
+hour_pm25_p
+```
+
++ 危害 (Hazardous)
+
+```{r hazard}
+hour_pm25_b <- read_xlsx("datasets/hour_pm25_final_v2.xlsx", sheet = 'b')
+hour_pm25_b
+```
+
+
+# 重點分析
+
+取空氣品質不佳的天數，分析各測站的空氣品質情形(空氣品質不佳天數的選擇標準為只要有一個測站空氣品質不佳就會進行分析)。
+
+### 10月份
+
+10-12月中，共計38天平均空氣品質呈現不佳(AQI)的情況，即為PM2.5 (μg/m3)24小時平均值達到54.5以上，對所有族群皆不健康  
+其中10月共計11天，分別為： 
+
+2017/10/1、2017/10/2、2017/10/3、2017/10/9、2017/10/10、2017/10/11、2017/10/15、2017/10/19、2017/10/22、2017/10/23、2017/10/30等日，而分析各測站於上述日期之空氣品質，可見在各時點中，並空氣品質變差之時段並不一致，可能為清晨、傍晚或白天。
+
+```{r hr}
+x <- list(
+  zeroline = FALSE,
+  showline = TRUE,
+  title = "小時")
+
+pal <- c("#56ed00","#eded02","#fc9f00", "#FF0000","#7401DF","#8A0808")
+pal <- setNames(pal, c("Good","Moderate","Unhealthy for Sensitive Groups","Unhealthy","Very unhealthy","Hazardous"))
+
+```
+
+
+```{r 10.1, echo=FALSE, warning=FALSE}
+p1001 <-
+  site_hour[site_hour$date.v2 == '2017-10-01',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-10-01',]$hours,
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-10-01',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-10-01',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/10/01','\n',"PM2.5"),
+      range = c(1,150)))
+
+p1002 <-
+  site_hour[site_hour$date.v2 == '2017-10-02',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-10-02',]$hours,
+                      
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-10-02',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-10-02',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/10/02','\n',"PM2.5"),
+      range = c(1,150)))
+
+
+p1003 <-
+  site_hour[site_hour$date.v2 == '2017-10-03',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-10-03',]$hours,
+                      
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-10-03',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-10-03',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/10/03','\n',"PM2.5"),
+      range = c(1,150)))
+
+
+p1009 <-
+  site_hour[site_hour$date.v2 == '2017-10-09',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-10-09',]$hours,
+                      
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-10-09',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-10-09',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/10/09','\n',"PM2.5"),
+      range = c(1,150)))
+
+
+p1010 <-
+  site_hour[site_hour$date.v2 == '2017-10-10',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-10-10',]$hours,
+                      
+                       site_hour[site_hour$date.v2 == '2017-10-10',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-10-10',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/10/10','\n',"PM2.5"),
+      range = c(1,150)))
+
+p1011 <-
+  site_hour[site_hour$date.v2 == '2017-10-11',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-10-11',]$hours,
+                     
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-10-11',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-10-11',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/10/11','\n',"PM2.5"),
+      range = c(1,150)))
+
+
+subplot(p1001, p1002, p1003, p1009, p1010, p1011, nrows = 3, shareX = T, titleY = TRUE) %>%
+  layout (showlegend = FALSE)
+```
+
+### 11月份
+
+在11月的部分，空氣品質不佳的天數共計12天，分別為：
+
+2017/11/4、2017/11/7、2017/11/8、2017/11/10、2017/11/11、2017/11/13、2017/11/17、2017/11/18、2017/11/22、2017/11/24、2017/11/28、2017/11/29等日，分析各日期的逐時空氣品質，亦可見在空氣品質不佳的時間點不一致，在各時間點皆有空氣品質不佳的狀況。
+
+```{r 11.1, echo=FALSE, warning=FALSE}
+p1104 <-
+  site_hour[site_hour$date.v2 == '2017-11-04',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-04',]$hours,
+                       
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-04',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-04',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/11/04','\n',"PM2.5"),
+      range = c(1,150)))
+
+p1107 <-
+  site_hour[site_hour$date.v2 == '2017-11-07',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-07',]$hours,
+                      
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-07',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-07',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/11/07','\n',"PM2.5"),
+      range = c(1,150)))
+
+
+p1108 <-
+  site_hour[site_hour$date.v2 == '2017-11-08',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-08',]$hours,
+                      
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-08',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-08',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/11/08','\n',"PM2.5"),
+      range = c(1,150)))
+
+p1110 <-
+  site_hour[site_hour$date.v2 == '2017-11-10',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-10',]$hours,
+                      
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-10',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-10',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/11/10','\n',"PM2.5"),
+      range = c(1,150)))
+
+p1111 <-
+  site_hour[site_hour$date.v2 == '2017-11-11',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-11',]$hours,
+                      
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-11',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-11',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/11/11','\n',"PM2.5"),
+      range = c(1,150)))
+
+
+p1113 <-
+  site_hour[site_hour$date.v2 == '2017-11-13',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-13',]$hours,
+                      
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-13',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-13',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/11/13','\n',"PM2.5"),
+      range = c(1,150)))
+
+
+subplot(p1104, p1107, p1108, p1110, p1111, p1113, nrows = 3, shareX = T, titleY = TRUE) %>%
+  layout (showlegend = FALSE)
+
+```
+
+
+
+```{r 11.2, echo=FALSE, warning=FALSE}
+p1117 <-
+  site_hour[site_hour$date.v2 == '2017-11-17',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-17',]$hours,
+                    
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-17',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-17',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/11/17','\n',"PM2.5"),
+      range = c(1,150)))
+
+p1118 <-
+  site_hour[site_hour$date.v2 == '2017-11-18',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-18',]$hours,
+                      
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-18',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-18',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/11/18','\n',"PM2.5"),
+      range = c(1,150)))
+
+
+p1122 <-
+  site_hour[site_hour$date.v2 == '2017-11-22',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-22',]$hours,
+                     
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-22',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-22',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/11/22','\n',"PM2.5"),
+      range = c(1,150)))
+
+p1124 <-
+  site_hour[site_hour$date.v2 == '2017-11-24',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-24',]$hours,
+                     
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-24',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-24',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/11/24','\n',"PM2.5"),
+      range = c(1,150)))
+
+p1128 <-
+  site_hour[site_hour$date.v2 == '2017-11-28',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-28',]$hours,
+                    
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-28',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-28',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/11/28','\n',"PM2.5"),
+      range = c(1,150)))
+
+p1129 <-
+  site_hour[site_hour$date.v2 == '2017-11-29',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-29',]$hours,
+                   
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-29',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-11-29',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/11/29','\n',"PM2.5"),
+      range = c(1,150)))
+
+subplot(p1117, p1118,p1122, p1124, p1128, p1129, nrows = 3, shareX = T, titleY = TRUE) %>%
+  layout (showlegend = FALSE)
+
+```
+
+
+### 12月份
+
+12月中空氣品質不佳的天數共計15天，分別為：
+
+2017/12/1、2017/12/4、2017/12/8、2017/12/11、2017/12/20、2017/12/22、2017/12/23、2017/12/24、2017/12/25、2017/12/26、2017/12/27、2017/12/28、2017/12/29、2017/12/30、2017/12/31等日，於逐時圖中呈現與10、11月相同狀況，空氣品質不佳之時間點散布於各時間點，於各日期中，並未有單一時間點空氣品質同時變差之情況。
+
+```{r 12.1, echo=FALSE, warning=FALSE}
+p1201 <-
+  site_hour[site_hour$date.v2 == '2017-12-01',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-01',]$hours,
+                     
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-01',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-01',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/12/01','\n',"PM2.5"),
+      range = c(1,150)))
+
+p1204 <-
+  site_hour[site_hour$date.v2 == '2017-12-04',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-04',]$hours,
+                    
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-04',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-04',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/12/04','\n',"PM2.5"),
+      range = c(1,150)))
+
+p1208 <-
+  site_hour[site_hour$date.v2 == '2017-12-08',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-08',]$hours,
+                      
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-08',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-08',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/12/08','\n',"PM2.5"),
+      range = c(1,150)))
+
+subplot(p1201, p1204, p1208, nrows = 2, shareX = T, titleY = TRUE) %>%
+  layout (showlegend = FALSE)
+
+```
+
+
+
+```{r 12.2, echo=FALSE, warning=FALSE}
+p1211 <-
+  site_hour[site_hour$date.v2 == '2017-12-11',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-11',]$hours,
+                      
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-11',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-11',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/12/11','\n',"PM2.5"),
+      range = c(1,150)))
+
+p1220 <-
+  site_hour[site_hour$date.v2 == '2017-12-20',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-20',]$hours,
+                     
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-20',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-20',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/12/20','\n',"PM2.5")))
+
+p1222 <-
+  site_hour[site_hour$date.v2 == '2017-12-22',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-22',]$hours,
+                       
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-22',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-22',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/12/22','\n',"PM2.5")))
+
+p1223 <-
+  site_hour[site_hour$date.v2 == '2017-12-23',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-23',]$hours,
+                      
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-23',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-23',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/12/23','\n',"PM2.5")))
+
+
+p1224 <-
+  site_hour[site_hour$date.v2 == '2017-12-24',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-24',]$hours,
+                      
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-24',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-24',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/12/24','\n',"PM2.5")))
+
+p1225 <-
+  site_hour[site_hour$date.v2 == '2017-12-25',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-25',]$hours,
+                       
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-25',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-25',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/12/25','\n',"PM2.5")))
+
+
+
+subplot(p1211, p1220, p1222, p1223, p1224, p1225, nrows = 3, shareX = T, titleY = TRUE) %>%
+  layout (showlegend = FALSE)
+
+
+```
+
+```{r 12.3, echo=FALSE, warning=FALSE}
+p1226 <-
+  site_hour[site_hour$date.v2 == '2017-12-26',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-26',]$hours,
+                     
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-26',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-26',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/12/26','\n',"PM2.5")))
+
+p1227 <-
+  site_hour[site_hour$date.v2 == '2017-12-27',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-27',]$hours,
+                       
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-27',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-27',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/12/27','\n',"PM2.5")))
+
+p1228 <-
+  site_hour[site_hour$date.v2 == '2017-12-28',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-28',]$hours,
+                      
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-28',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-28',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = "小時"),
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/12/28','\n',"PM2.5")))
+
+p1229 <-
+  site_hour[site_hour$date.v2 == '2017-12-29',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-29',]$hours,
+                     
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-29',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-29',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = "小時"),
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/12/29','\n',"PM2.5")))
+
+
+
+p1230 <-
+  site_hour[site_hour$date.v2 == '2017-12-30',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-30',]$hours,
+                     
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-30',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-30',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/12/30','\n',"PM2.5")))
+
+p1231 <-
+  site_hour[site_hour$date.v2 == '2017-12-31',]%>%
+  plot_ly(type = 'scatter',
+          mode = 'markers',
+          x = ~hours,
+          y = ~pm25,
+          color = ~AQI,
+          colors = pal,
+          text = paste('<br>hour: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-31',]$hours,
+                     
+                       '<br>pm2.5: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-31',]$pm25,
+                       '<br>AQI: ', 
+                       site_hour[site_hour$date.v2 == '2017-12-31',]$AQI),
+          hoverinfo = 'text') %>%
+  layout(
+    xaxis = x,
+    yaxis = list(
+      zeroline = FALSE,
+      showline = TRUE,
+      title = paste0('2017/12/31','\n',"PM2.5")))
+
+
+subplot(p1226, p1227, p1228, p1229, p1230, p1231, nrows = 3, shareX = T, titleY = TRUE) %>%
+  layout (showlegend = FALSE)
+
+```
+
+## 小結
+
+透過分析臺中火力發電廠周遭空氣品質監測站之 PM2.5 逐時濃度資料，可得知各測站並未在特定時間點有空氣品質不佳之情形，與先前假設火力發電廠排放之汙染氣體可能於特定時段影響周遭之空氣品質的假設不一致。
+

@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+
+<meta charset="utf-8" />
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="pandoc" />
+
+
+
+
+<title>資料視覺化</title>
+
+<script src="site_libs/jquery-1.12.4/jquery.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/flatly.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<script src="site_libs/jqueryui-1.11.4/jquery-ui.min.js"></script>
+<link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<link href="site_libs/highlightjs-9.12.0/default.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
+<script src="site_libs/htmlwidgets-0.9/htmlwidgets.js"></script>
+<link href="site_libs/leaflet-0.7.7/leaflet.css" rel="stylesheet" />
+<script src="site_libs/leaflet-0.7.7/leaflet.js"></script>
+<link href="site_libs/leafletfix-1.0.0/leafletfix.css" rel="stylesheet" />
+<link href="site_libs/leaflet-label-0.2.2/leaflet.label.css" rel="stylesheet" />
+<script src="site_libs/leaflet-label-0.2.2/leaflet.label.js"></script>
+<script src="site_libs/Proj4Leaflet-0.7.2/proj4-compressed.js"></script>
+<script src="site_libs/Proj4Leaflet-0.7.2/proj4leaflet.js"></script>
+<script src="site_libs/leaflet-binding-1.1.0/leaflet.js"></script>
+<script src="site_libs/datatables-binding-0.2/datatables.js"></script>
+<link href="site_libs/dt-core-1.10.12/css/jquery.dataTables.min.css" rel="stylesheet" />
+<link href="site_libs/dt-core-1.10.12/css/jquery.dataTables.extra.css" rel="stylesheet" />
+<script src="site_libs/dt-core-1.10.12/js/jquery.dataTables.min.js"></script>
+
+<style type="text/css">code{white-space: pre;}</style>
+<style type="text/css">
+  pre:not([class]) {
+    background-color: white;
+  }
+</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+<style type="text/css">
+h1 {
+  font-size: 34px;
+}
+h1.title {
+  font-size: 38px;
+}
+h2 {
+  font-size: 30px;
+}
+h3 {
+  font-size: 24px;
+}
+h4 {
+  font-size: 18px;
+}
+h5 {
+  font-size: 16px;
+}
+h6 {
+  font-size: 12px;
+}
+.table th:not([align]) {
+  text-align: left;
+}
+</style>
+
+<link rel="stylesheet" href="style.css" type="text/css" />
+
+</head>
+
+<body>
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+code {
+  color: inherit;
+  background-color: rgba(0, 0, 0, 0.04);
+}
+img {
+  max-width:100%;
+  height: auto;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+</style>
+
+
+<style type="text/css">
+/* padding for bootstrap navbar */
+body {
+  padding-top: 60px;
+  padding-bottom: 40px;
+}
+/* offset scroll position for anchor links (for fixed navbar)  */
+.section h1 {
+  padding-top: 65px;
+  margin-top: -65px;
+}
+
+.section h2 {
+  padding-top: 65px;
+  margin-top: -65px;
+}
+.section h3 {
+  padding-top: 65px;
+  margin-top: -65px;
+}
+.section h4 {
+  padding-top: 65px;
+  margin-top: -65px;
+}
+.section h5 {
+  padding-top: 65px;
+  margin-top: -65px;
+}
+.section h6 {
+  padding-top: 65px;
+  margin-top: -65px;
+}
+</style>
+
+<script>
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark it active
+  menuAnchor.parent().addClass('active');
+
+  // if it's got a parent navbar menu mark it active as well
+  menuAnchor.closest('li.dropdown').addClass('active');
+});
+</script>
+
+
+<div class="container-fluid main-container">
+
+<!-- tabsets -->
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+</script>
+
+<!-- code folding -->
+
+
+
+
+<script>
+$(document).ready(function ()  {
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_').toLowerCase();
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+  padding-left: 25px;
+  text-indent: 0;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row-fluid">
+<div class="col-xs-12 col-sm-4 col-md-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">106-1 CS+X DSP : Airbox </a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="index.html">Introduction</a>
+</li>
+<li>
+  <a href="data.html">Data Processing</a>
+</li>
+<li>
+  <a href="visual.html">Data Visualization</a>
+</li>
+<li>
+  <a href="analysis.html">Data Analysis</a>
+</li>
+<li>
+  <a href="https://chianjrchiu.shinyapps.io/Airbox/">Airbox</a>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<div class="fluid-row" id="header">
+
+
+
+<h1 class="title toc-ignore">資料視覺化</h1>
+
+</div>
+
+
+<div class="section level2">
+<h2>資料匯入</h2>
+<pre class="r"><code>Sys.setlocale(category=&#39;LC_ALL&#39;, locale=&#39;C&#39;)
+
+# 資料匯入與預處理
+site_location = read.csv(file.path(&quot;datasets&quot;, &quot;location.csv&quot;), encoding=&quot;UTF-8&quot;, stringsAsFactors=FALSE)
+site_location = site_location[ , c(&quot;id&quot;,&quot;lon&quot;,&quot;lat&quot;)]
+site_location$nid = substr(site_location$id,9,12)
+
+site_all = read.csv(file.path(&quot;datasets&quot;, &quot;site_all.csv&quot;), encoding=&quot;UTF-8&quot;, stringsAsFactors=FALSE)</code></pre>
+</div>
+<div class="section level2">
+<h2>套件執行</h2>
+<pre class="r"><code>library(leaflet)
+library(dplyr)
+library(openair)
+library(dygraphs)
+library(maps)
+library(ggplot2)
+library(ggmap)
+#library(mapproj)
+library(plotly)</code></pre>
+</div>
+<div class="section level2">
+<h2>觀測點位置圖</h2>
+<pre class="r"><code>map_location &lt;- leaflet(site_location) %&gt;% 
+        setView(lng=120.595,lat=24.265,zoom=12) %&gt;%
+          addTiles(options = providerTileOptions(noWrap = TRUE)) %&gt;%
+            addCircleMarkers(~lon,~lat,label=~nid,radius=8,color=&quot;white&quot;,fillColor=&quot;red&quot;,stroke=TRUE,fillOpacity=0.8)
+map_location</code></pre>
+<div id="htmlwidget-39761a273b19b5d88a02" style="width:672px;height:480px;" class="leaflet html-widget"></div>
+<script type="application/json" data-for="htmlwidget-39761a273b19b5d88a02">{"x":{"options":{"crs":{"crsClass":"L.CRS.EPSG3857","code":null,"proj4def":null,"projectedBounds":null,"options":{}}},"setView":[[24.265,120.595],12,[]],"calls":[{"method":"addTiles","args":["//{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",null,null,{"errorTileUrl":"","noWrap":true,"zIndex":null,"unloadInvisibleTiles":null,"updateWhenIdle":null,"detectRetina":false,"reuseTiles":false,"attribution":"&copy; <a href=\"http://openstreetmap.org\">OpenStreetMap<\/a> contributors, <a href=\"http://creativecommons.org/licenses/by-sa/2.0/\">CC-BY-SA<\/a>"}]},{"method":"addCircleMarkers","args":[[24.29,24.276,24.279,24.25,24.266,24.25,24.235,24.25,24.243,24.229,24.216,24.201,24.196,24.213,24.239,24.154,24.163,24.159,24.168,24.195,24.266,24.215,24.242,24.226,24.194,24.279,24.312,24.299,24.267,24.204,24.113,24.126,24.119],[120.581,120.574,120.556,120.555,120.573,120.559,120.535,120.538,120.542,120.532,120.526,120.522,120.547,120.55,120.554,120.546,120.544,120.567,120.574,120.56,120.566,120.564,120.567,120.582,120.547,120.565,120.561,120.577,120.578,120.561,120.503,120.512,120.522],8,null,null,{"lineCap":null,"lineJoin":null,"clickable":true,"pointerEvents":null,"className":"","stroke":true,"color":"white","weight":5,"opacity":0.5,"fill":true,"fillColor":"red","fillOpacity":0.8,"dashArray":null},null,null,null,null,["C4EE","C4FC","C4F6","C262","C4A6","C25A","C248","C25C","C240","C246","C4C8","C2A6","C374","C500","C24A","C53C","C568","C532","C5C6","E0E0","C396","C2BA","C3C2","C324","E0DE","4774","C454","C2F2","CED4","5240","C4CE","C3F0","4894"],null,null]}],"limits":{"lat":[24.113,24.312],"lng":[120.503,120.582]}},"evals":[],"jsHooks":[]}</script>
+<p>.</p>
+</div>
+<div class="section level2">
+<h2>觀測點日曆圖</h2>
+<p>呈現觀測點 <strong>2017年10~12月份</strong> 三個月份的空氣品質狀況。</p>
+<p>從日曆圖看出10月份PM2.5濃度達紅色警戒的天數多集中在10號、11號，而11月份則是多集中在17號、28號。 回顧新聞事件，29號是入秋最強一波空污來襲，多處測站則是在28號的時候，就發現空氣品質達紅色警戒。 比較令人注意的是12月底的空氣品質狀況，從22號開始到月底，幾乎天天都達紅色警戒，受東北季風影響，霾害嚴重。</p>
+<pre class="r"><code>plot_calendar &lt;- function(x){
+  nid = substr(x,9,12)
+  dta = read.csv(file.path(&quot;datasets/airdata_DP&quot;, x), stringsAsFactors=FALSE)
+  dta$date = as.POSIXct(strptime(dta$date, format= &quot;%Y-%m-%d %H:%M:%S&quot;, &quot;GMT&quot;))
+  
+  cplot = calendarPlot(dta, main =paste0(&quot;PM2.5 values from Oct-Dec 2017 at Site &quot;, nid),
+                       key.header=&quot;AQI value&quot;, 
+                       digits = 20,
+                       pollutant = &quot;PM2.5&quot;, annotate = &quot;date&quot;, year = 2017, breaks = c(0,15.4,35.4,54.4,150.4,250.4,350.4),
+                       labels = c(&quot;0.0 - 15.4&quot;,&quot;15.5 - 35.4&quot;,&quot;35.5 - 54.4&quot;,&quot;54.5 - 150.4&quot;,&quot;150.5 - 250.4&quot;,&quot;&gt;=250.5&quot;),
+                       cols = c(&quot;Green&quot;, &quot;Yellow&quot;, &quot;Orange&quot;, &quot;Red&quot;, &quot;Purple&quot;,&quot;darkmagenta&quot;))
+  
+  dev.print(pdf, file.path(&quot;visuals/calendar&quot;, paste0(&quot;cplot_&quot;, nid, &quot;.pdf&quot;)))
+  }</code></pre>
+<pre class="r"><code>par(mfrow=c(34,1))
+
+temp = list.files(path=&quot;datasets/airdata_DP&quot;, pattern=&quot;*.csv&quot;)
+lapply(temp, plot_calendar)</code></pre>
+<p><img src="visuals/calendar/cplot_4774-1.png" width="30%" /><img src="visuals/calendar/cplot_4894-1.png" width="30%" /><img src="visuals/calendar/cplot_5240-1.png" width="30%" /><img src="visuals/calendar/cplot_C24A-1.png" width="30%" /><img src="visuals/calendar/cplot_C25A-1.png" width="30%" /><img src="visuals/calendar/cplot_C25C-1.png" width="30%" /><img src="visuals/calendar/cplot_C2A6-1.png" width="30%" /><img src="visuals/calendar/cplot_C2BA-1.png" width="30%" /><img src="visuals/calendar/cplot_C2F2-1.png" width="30%" /><img src="visuals/calendar/cplot_C3C2-1.png" width="30%" /><img src="visuals/calendar/cplot_C3F0-1.png" width="30%" /><img src="visuals/calendar/cplot_C4A6-1.png" width="30%" /><img src="visuals/calendar/cplot_C4C8-1.png" width="30%" /><img src="visuals/calendar/cplot_C4CE-1.png" width="30%" /><img src="visuals/calendar/cplot_C4EE-1.png" width="30%" /><img src="visuals/calendar/cplot_C4F4-1.png" width="30%" /><img src="visuals/calendar/cplot_C4F6-1.png" width="30%" /><img src="visuals/calendar/cplot_C4FC-1.png" width="30%" /><img src="visuals/calendar/cplot_C53C-1.png" width="30%" /><img src="visuals/calendar/cplot_C5C6-1.png" width="30%" /></p>
+</div>
+<div class="section level2">
+<h2>觀測點測值統整</h2>
+<pre class="r"><code>plot_table &lt;- function(x){
+  nid = substr(x,9,12)
+  dta = read.csv(file.path(&quot;datasets/airdata_DP&quot;, x), stringsAsFactors=FALSE)
+  dta_TB = dta %&gt;%
+  group_by(nmonth, ndate) %&gt;%
+  summarise(PM2.5 = mean(PM2.5)) %&gt;%
+  mutate(category=cut(PM2.5, breaks=c(-Inf, 15.4, 35.4, 54.4, 150.4, 250.4, Inf), 
+                        labels=c(&quot;cg&quot;,&quot;cy&quot;,&quot;co&quot;,&quot;cr&quot;,&quot;cp&quot;,&quot;cb&quot;)))
+  
+  dta_TB = as.data.frame.matrix(with(dta_TB, table(nmonth, category)))
+
+rownames(dta_TB) &lt;- c(&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;)
+colnames(dta_TB) &lt;- c(&quot;Good&quot;,&quot;Moderate&quot;,&quot;Unhealthy for Sensitive Groups&quot;,&quot;Unhealthy&quot;,&quot;Very Unhealthy&quot;,&quot;Hazardous&quot;)
+dta_TB$id &lt;- nid
+
+write.csv(dta_TB, file.path(&quot;datasets/airdata_TB&quot;, x))
+}</code></pre>
+<pre class="r"><code>temp = list.files(path=&quot;datasets/airdata_DP&quot;, pattern=&quot;*.csv&quot;)
+lapply(temp, plot_table)</code></pre>
+<div id="htmlwidget-28e3e3089dd2b80f449a" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-28e3e3089dd2b80f449a">{"x":{"filter":"none","data":[["1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","32","33","34","35","36","37","38","39","40","41","42","43","44","45","46","47","48","49","50","51","52","53","54","55","56","57","58","59","60","61","62","63","64","65","66","67","68","69","70","71","72","73","74","75","76","77","78","79","80","81","82","83","84","85","86","87","88","89","90","91","92","93","94","95","96","97","98","99","100","101","102"],["Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec","Oct","Nov","Dec"],[3,3,1,4,1,0,2,3,1,2,3,1,5,6,2,3,5,2,5,7,7,4,5,3,6,4,4,2,3,1,5,6,4,7,7,6,4,5,5,5,6,6,5,3,3,0,1,1,4,5,3,4,4,2,5,5,4,1,1,1,6,6,5,2,1,0,3,3,2,5,5,3,8,8,4,2,2,1,7,6,4,5,2,3,5,4,3,6,4,6,4,4,2,3,6,5,5,4,3,2,2,1],[18,21,15,14,21,9,18,19,13,18,17,11,15,12,16,20,20,15,17,21,13,19,19,19,16,20,15,18,20,12,18,16,11,15,17,13,18,17,15,15,17,14,16,21,14,22,24,11,13,19,15,18,20,15,18,17,15,16,20,14,17,19,16,17,20,12,20,19,17,18,21,15,16,12,10,17,20,12,15,17,15,14,20,12,17,19,11,16,20,13,19,20,14,14,18,14,18,17,14,20,18,9],[9,4,11,12,5,12,10,6,12,10,8,12,9,7,7,7,3,10,6,1,9,8,5,7,8,5,9,9,5,5,7,7,7,8,5,8,8,6,6,8,4,10,10,4,9,9,3,12,7,4,8,8,3,8,7,3,10,8,6,12,8,4,8,10,7,12,7,4,7,7,4,11,7,3,10,11,6,12,9,5,9,10,7,10,8,3,8,7,5,8,7,4,10,11,4,10,6,4,8,8,8,14],[1,2,4,1,3,6,1,2,5,1,2,7,1,5,6,1,2,4,0,1,2,0,1,2,1,1,3,2,2,5,1,1,3,1,1,4,1,2,5,1,0,1,0,2,5,0,2,6,1,2,1,1,3,6,1,1,2,1,2,4,0,1,2,2,2,7,1,2,4,1,0,2,0,1,0,1,2,6,0,1,3,0,1,6,1,1,2,1,1,4,1,2,5,0,2,2,2,1,5,1,2,7],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],["C240","C240","C240","C246","C246","C246","C248","C248","C248","C24A","C24A","C24A","C25A","C25A","C25A","C25C","C25C","C25C","C262","C262","C262","C2A6","C2A6","C2A6","C2BA","C2BA","C2BA","C2F2","C2F2","C2F2","C324","C324","C324","C374","C374","C374","C396","C396","C396","C3C2","C3C2","C3C2","C3F0","C3F0","C3F0","C454","C454","C454","C4A6","C4A6","C4A6","C4C8","C4C8","C4C8","C4CE","C4CE","C4CE","C4EE","C4EE","C4EE","C4F4","C4F4","C4F4","C4F6","C4F6","C4F6","C4FC","C4FC","C4FC","C500","C500","C500","C532","C532","C532","C53C","C53C","C53C","C568","C568","C568","C5C6","C5C6","C5C6","E0DE","E0DE","E0DE","E0E0","E0E0","E0E0","4774","4774","4774","4894","4894","4894","5240","5240","5240","CED4","CED4","CED4"]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th> <\/th>\n      <th>Month<\/th>\n      <th>Good<\/th>\n      <th>Moderate<\/th>\n      <th>Unhealthy.for.Sensitive.Groups<\/th>\n      <th>Unhealthy<\/th>\n      <th>Very.Unhealthy<\/th>\n      <th>Hazardous<\/th>\n      <th>id<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"pageLength":3,"autoWidth":true,"columnDefs":[{"className":"dt-right","targets":[2,3,4,5,6,7]},{"orderable":false,"targets":0}],"order":[],"orderClasses":false,"lengthMenu":[3,10,25,50,100]},"selection":{"mode":"multiple","selected":null,"target":"row"}},"evals":[],"jsHooks":[]}</script>
+</div>
+
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.header').parent('thead').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

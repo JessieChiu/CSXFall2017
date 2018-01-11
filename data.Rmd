@@ -1,0 +1,66 @@
+---
+title: "資料處理"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 套件執行
+
+```{r library, message=FALSE}
+library(dplyr)
+```
+
+## 資料處理
+
+### 空氣盒子觀測點
+
+```{r process, eval=FALSE}
+air_DP <- function(x){
+
+# import data
+dta = read.csv(file.path("datasets/airdata", x), header = TRUE)
+
+# trim dataset
+dta = dta[ , c("gps_lat","gps_lon","s_d0","date","time")]
+colnames(dta)[1:3] = c("lat", "lon", "PM2.5")
+
+dta$date = as.character(paste(dta$date,dta$time,sep = " "))
+dta$date = as.POSIXct(strptime(dta$date, format= "%Y-%m-%d %H:%M:%S", "GMT"))
+
+dta$nmonth = as.numeric(substr(dta$date,6,7))
+dta$ndate = as.numeric(substr(dta$date,9,10))
+dta$nhour = as.numeric(substr(dta$date,12,13))
+dta$PM2.5 = as.numeric(dta$PM2.5)
+
+write.csv(dta, file.path("datasets/airdata_DP", x))
+}
+
+temp = list.files(path="datasets/airdata", pattern="*.csv")
+
+lapply(temp, air_DP)
+```
+
+```{r dta, echo=FALSE}
+dta = read.csv(file.path("datasets/airdata_DP", "74DA3895C240.csv"), fileEncoding = "UTF-8", header = TRUE)
+dta = dta[,-1]
+
+DT:::datatable(
+    head(dta, n=10),
+    extensions = list("Scroller" = NULL,
+                      'FixedHeader' = NULL,
+                      "FixedColumns" = list(leftColumns=4)),
+    options = list(
+                deferRender = TRUE,
+                scrollY = 200,
+                scroller = TRUE,
+                autoWidth=TRUE,
+                pageLength = 50,
+                fixedHeader = TRUE,
+                dom = 't',
+                scrollX = TRUE,
+                fixedColumns = list(leftColumns=4)
+                  )
+              )
+```
